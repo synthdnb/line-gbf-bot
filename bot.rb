@@ -7,6 +7,9 @@ require 'line/bot'
 require 'pry'
 require 'redis'
 
+Encoding.default_external = Encoding::UTF_8
+Encoding.default_internal = Encoding::UTF_8
+
 set :bind, "0.0.0.0"
 
 def redis
@@ -30,6 +33,9 @@ def get_display_name user_id
     nil
   end
 end
+
+
+reserved = %w(공지 등록 삭제 목록)
 
 post '/callback' do
   body = request.body.read
@@ -59,17 +65,18 @@ post '/callback' do
     when Line::Bot::Event::Message
       case event.type
       when Line::Bot::Event::MessageType::Text
-        if event.message['text'].match(/!(\S+)\s+(.+)/)
+        if event.message['text'].match(/\A!(\S+)(.*)/m)
           cmd = $1
-          content = $2
+          content = $2.strip
           message = {}
+          keywords = redis.hkeys "keywords"
           case cmd
           when "공지"
             break unless event["source"]["type"] == "user"
             sender = get_display_name(event["source"]["userId"])
             message = {
               type: 'text',
-              text: "From #{sender}\n#{content}"
+              text: "[기공단 공지사항] From #{sender}\n#{content}"
             }
             receivers = redis.smembers "receivers" 
             receivers.each do |target|
@@ -80,18 +87,53 @@ post '/callback' do
               text: "#{receivers.length}명에게 공지를 발송했습니다"
             }
             client.reply_message(event['replyToken'], message)
-          when "일정"
+          when "등록"
+            break unless event["source"]["type"] == "user"
+            content.match /\A(\S+)(.*)/m
+            key = $1
+            value = $2.strip
+            if reserved.include? key
+              message = {
+                type: 'text',
+                text: "예약된 키워드입니다",
+              }
+            else
+              redis.hset "keywords", key, value
+              message = {
+                type: 'text',
+                text: "키워드 '#{key}' 등록을 완료했습니다",
+              }
+            end
+            client.reply_message(event['replyToken'], message)
+          when "삭제"
+            break unless event["source"]["type"] == "user"
+            content.match /\A(\S+)(.*)/m
+            key = $1
+            redis.hdel "keywords", key
             message = {
               type: 'text',
-              text: <<-EOT
-              5월 일정
-              ~5/9 아스트레이 알케미스트
-              5/10~5/15 사상강림
-              5/17~5/24 고전장
-              5/25~5/30 영웅재기
-              5/25~5/30 제노이프리트
-              5/31~ 시나리오
-              EOT
+              text: "키워드 '#{key}' 삭제를 완료했습니다",
+            }
+            client.reply_message(event['replyToken'], message)
+          when "목록"
+            break unless event["source"]["type"] == "user"
+            message = {
+              type: 'text',
+              text: "키워드 목록: #{keywords.join(", ")}",
+            }
+            client.reply_message(event['replyToken'], message)
+          when *keywords
+            response = redis.hget "keywords", cmd
+            message = {
+              type: 'text',
+              text: response
+            }
+            client.reply_message(event['replyToken'], message)
+          else
+            break unless event["source"]["type"] == "user"
+            message = {
+              type: 'text',
+              text: "알 수 없는 명령입니다",
             }
             client.reply_message(event['replyToken'], message)
           end
