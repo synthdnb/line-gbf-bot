@@ -89,7 +89,14 @@ post '/callback' do
             break unless event["source"]["type"] == "user"
             receivers = redis.smembers "receivers" 
             receivers.map! do |target|
-              get_display_name(target)
+              redis_key = "userid-#{target}"
+              if val = redis.get(redis_key)
+                val
+              else
+                display_name = get_display_name(target)
+                redis.setex redis_key, 86400, get_display_name(target)
+                display_name
+              end
             end
             message = {
               type: 'text',
