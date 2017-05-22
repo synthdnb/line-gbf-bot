@@ -79,9 +79,7 @@ post '/callback' do
               text: "[기공단 공지사항] From #{sender}\n#{content}"
             }
             receivers = redis.smembers "receivers" 
-            receivers.each do |target|
-              client.push_message target, message
-            end
+            client.multicast(receivers, message)
             message = {
               type: 'text',
               text: "#{receivers.length}명에게 공지를 발송했습니다"
