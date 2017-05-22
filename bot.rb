@@ -127,7 +127,6 @@ post '/callback' do
             }
             client.reply_message(event['replyToken'], message)
           when "목록"
-            break unless event["source"]["type"] == "user"
             message = {
               type: 'text',
               text: "키워드 목록: #{keywords.join(", ")}",
