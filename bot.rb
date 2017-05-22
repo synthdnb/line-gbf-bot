@@ -87,6 +87,17 @@ post '/callback' do
               text: "#{receivers.length}명에게 공지를 발송했습니다"
             }
             client.reply_message(event['replyToken'], message)
+          when "공지목록"
+            break unless event["source"]["type"] == "user"
+            receivers = redis.smembers "receivers" 
+            receivers.map! do |target|
+              get_display_name(target)
+            end
+            message = {
+              type: 'text',
+              text: "공지 수신자 목록\n#{receivers.join("\n")}"
+            }
+            client.reply_message(event['replyToken'], message)
           when "등록"
             break unless event["source"]["type"] == "user"
             content.match /\A(\S+)(.*)/m
