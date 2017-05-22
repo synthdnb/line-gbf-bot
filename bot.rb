@@ -107,11 +107,18 @@ post '/callback' do
                 text: "예약된 키워드입니다",
               }
             else
-              redis.hset "keywords", key, value
-              message = {
-                type: 'text',
-                text: "키워드 '#{key}' 등록을 완료했습니다",
-              }
+              if value == ""
+                message = {
+                  type: 'text',
+                  text: "내용을 입력해주세요",
+                }
+              else
+                redis.hset "keywords", key, value
+                message = {
+                  type: 'text',
+                  text: "키워드 '#{key}' 등록을 완료했습니다",
+                }
+              end
             end
             client.reply_message(event['replyToken'], message)
           when "삭제"
